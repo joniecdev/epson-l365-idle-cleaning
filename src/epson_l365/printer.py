@@ -3,7 +3,8 @@ import struct
 
 from . import config
 
-def read_counter():
+
+def read_telemetry():
     payload = bytes.fromhex(config.SNMP_PAYLOAD_HEX)
     marker = bytes.fromhex("63 64 01 00 00")
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
@@ -12,20 +13,36 @@ def read_counter():
         response, _ = sock.recvfrom(4096)
 
     marker_index = response.find(marker)
-    counter_start = marker_index + len(marker)
-    if marker_index < 0 or len(response) < counter_start + 4:
-        raise ValueError("SNMP response does not contain a page counter")
-    return struct.unpack_from("<I", response, counter_start)[0]
+    data_start = marker_index + len(marker)
+    if marker_index < 0 or len(response) < data_start + 75:
+        raise ValueError("SNMP response does not contain complete telemetry")
+    data = response[data_start:]
+    return {
+        "manual_cleanings": data[24],
+        "total_pages": struct.unpack_from("<I", data, 37)[0],
+    }
+
+
+def read_counter():
+    return read_telemetry()["total_pages"]
+
+
+def read_cleaning_counter():
+    return read_telemetry()["manual_cleanings"]
 
 def trigger_cleaning():
-    if not config.CLEANING_PAYLOAD_HEX:
-        return True
     payload = bytes.fromhex(config.CLEANING_PAYLOAD_HEX)
-    with socket.create_connection(
-        (config.PRINTER_IP, config.CLEANING_PORT),
-        timeout=config.SOCKET_TIMEOUT_SECONDS,
-    ) as connection:
-        connection.sendall(payload)
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as connection:
+            connection.settimeout(5)
+            connection.connect((config.PRINTER_IP, config.CLEANING_PORT))
+            connection.sendall(payload)
+    except socket.timeout:
+        return False
+    except ConnectionRefusedError:
+        return False
+    except OSError:
+        return False
     return True
 
 class Printer:

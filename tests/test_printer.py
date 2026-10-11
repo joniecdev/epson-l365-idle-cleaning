@@ -1,4 +1,6 @@
 import unittest
+from unittest.mock import patch
+
 from src.epson_l365.printer import Printer
 
 class TestPrinter(unittest.TestCase):
@@ -18,7 +20,8 @@ class TestPrinter(unittest.TestCase):
         self.assertTrue(result)
 
     def test_perform_maintenance(self):
-        result = self.printer.perform_maintenance()
+        with patch("src.epson_l365.printer.trigger_cleaning", return_value=True):
+            result = self.printer.perform_maintenance()
         self.assertTrue(result)
 
     def test_handle_edge_cases(self):

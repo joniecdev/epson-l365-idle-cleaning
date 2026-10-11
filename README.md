@@ -1,37 +1,51 @@
 # Epson L365 idle cleaning
 
-Mały skrypt uruchamiany raz dziennie. Odczytuje licznik stron drukarki Epson L365, zapisuje stan w `/data/printer_state.json` i wysyła powiadomienia przez Discord.
+A small daily maintenance script for the Epson EcoTank L365. It reads printer telemetry over SNMP, detects long periods without printing, triggers a light cleaning over raw TCP, and reports confirmed or cancelled cleanings to Discord.
 
-## Konfiguracja
+The script runs once and exits. Persistent state is stored in `/data/printer_state.json`, so it can be started by cron, Portainer, or another scheduler.
 
-Ustaw te wartości w [config.py](src/epson_l365/config.py):
+## Configuration
 
-- `PRINTER_IP`
-- `DISCORD_WEBHOOK`
-- `CLEANING_PAYLOAD_HEX` (puste oznacza tryb testowy)
+Edit `src/epson_l365/config.py`:
 
-## Uruchomienie lokalne
+- `PRINTER_IP`: printer address
+- `DISCORD_WEBHOOK`: Discord webhook URL
+- `CLEANING_INTERVAL_DAYS`: idle period before scheduling cleaning
+- `CLEANING_PAYLOAD_HEX`: raw cleaning command
 
-```powershell
-$env:PYTHONPATH = "src"
-python -m epson_l365.main
+The default cleaning command targets Epson L365 firmware and should not be changed unless the printer protocol is known. Cleaning confirmation waits 3 minutes and retries up to two times at 10-minute intervals.
+
+## Local run
+
+Install the only runtime dependency and run one check from the repository root:
+
+```sh
+python -m pip install -r requirements.txt
+python -m src.epson_l365.main
 ```
-
-Polecenie wykonuje dokładnie jedno sprawdzenie. Wywołuj je codziennie przez cron, Harmonogram zadań albo Docker.
 
 ## Docker
 
-```powershell
+Build and run the one-shot container:
+
+```sh
 docker build -t epson-l365-cleaning .
-docker run --rm -v epson-l365-data:/data epson-l365-cleaning
+docker volume create epson-l365-data
+docker run --rm \
+  -v epson-l365-data:/data \
+  epson-l365-cleaning
 ```
 
-Wolumen `/data` musi być stały, ponieważ zawiera historię licznika i zaplanowanego czyszczenia.
+Keep `/data` on a persistent volume. The container needs network access to the printer on UDP port `161` and TCP port `9100`.
 
-## Testy
+For Portainer, deploy the repository as a Stack or build the image from the included `Dockerfile`. Schedule the container to run once per day; it exits normally after completing one check.
 
-```powershell
-python -m pytest
+## Tests
+
+```sh
+python -m unittest tests.test_printer -v
 ```
 
-Kod wykonawczy znajduje się w `src/epson_l365`. Pozostałe moduły projektu zachowują wcześniejsze API i nie są potrzebne do codziennego uruchamiania.
+## License
+
+No license has been selected for this repository yet. Add a `LICENSE` file before publishing if you want others to reuse the code.
