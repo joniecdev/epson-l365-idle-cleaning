@@ -48,4 +48,4 @@ python -m unittest tests.test_printer -v
 
 ## License
 
-No license has been selected for this repository yet. Add a `LICENSE` file before publishing if you want others to reuse the code.
+This project is licensed under the [MIT License](LICENSE).
