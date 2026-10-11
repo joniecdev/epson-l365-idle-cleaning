@@ -5,7 +5,9 @@ from datetime import date
 
 def _default_state():
     return {
-        "last_counter": 0,
+        "last_page_count": 0,
+        "last_manual_cleanings": 0,
+        "last_automatic_cleanings": 0,
         "last_activity_date": date.today().isoformat(),
         "cleaning_scheduled": False,
         "notified_offline_interval": False,
@@ -20,6 +22,8 @@ def load_state(path):
         state = json.load(state_file)
     defaults = _default_state()
     defaults.update(state)
+    if "last_page_count" not in state:
+        defaults["last_page_count"] = state.get("last_counter", 0)
     return defaults
 
 

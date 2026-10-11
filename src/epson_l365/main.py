@@ -24,7 +24,7 @@ def notify_discord(message):
     return True
 
 
-def verify_cleaning(page_counter, cleaning_counter):
+def verify_cleaning(page_counter, manual_cleanings, automatic_cleanings):
     for attempt in range(config.CLEANING_MAX_ATTEMPTS):
         if attempt:
             time.sleep(config.CLEANING_RETRY_DELAY_SECONDS)
@@ -36,10 +36,13 @@ def verify_cleaning(page_counter, cleaning_counter):
             continue
 
         if telemetry["total_pages"] > page_counter:
-            return "cancelled", telemetry["total_pages"]
-        if telemetry["manual_cleanings"] > cleaning_counter:
-            return "confirmed", telemetry["total_pages"]
-    return "unconfirmed", page_counter
+            return "cancelled", telemetry
+        if (
+            telemetry["manual_cleanings"] > manual_cleanings
+            or telemetry["automatic_cleanings"] > automatic_cleanings
+        ):
+            return "confirmed", telemetry
+    return "unconfirmed", {"total_pages": page_counter}
 
 
 def process_once(today=None):
@@ -49,7 +52,6 @@ def process_once(today=None):
 
     try:
         telemetry = read_telemetry()
-        current_counter = telemetry["total_pages"]
     except (OSError, ValueError, struct.error):
         if state["cleaning_scheduled"]:
             if not state["notified_offline_sched"]:
@@ -70,16 +72,34 @@ def process_once(today=None):
 
     state["notified_offline_interval"] = False
     state["notified_offline_sched"] = False
-    if current_counter > state["last_counter"]:
-        state["last_counter"] = current_counter
+    page_count_increased = telemetry["total_pages"] > state["last_page_count"]
+    cleaning_count_increased = (
+        telemetry["manual_cleanings"] > state["last_manual_cleanings"]
+        or telemetry["automatic_cleanings"] > state["last_automatic_cleanings"]
+    )
+    if page_count_increased:
+        state["last_page_count"] = telemetry["total_pages"]
+        state["last_manual_cleanings"] = telemetry["manual_cleanings"]
+        state["last_automatic_cleanings"] = telemetry["automatic_cleanings"]
         state["last_activity_date"] = today.isoformat()
         if state["cleaning_scheduled"]:
             notify_discord("🛑 New print jobs detected. Cancelling scheduled cleaning.")
             state["cleaning_scheduled"] = False
+    elif cleaning_count_increased:
+        state["last_page_count"] = telemetry["total_pages"]
+        state["last_manual_cleanings"] = telemetry["manual_cleanings"]
+        state["last_automatic_cleanings"] = telemetry["automatic_cleanings"]
+        state["last_activity_date"] = today.isoformat()
+        if state["cleaning_scheduled"]:
+            notify_discord(
+                "🛑 Cleaning activity detected. Cancelling scheduled cleaning."
+            )
+            state["cleaning_scheduled"] = False
     elif state["cleaning_scheduled"]:
-        cleaning_status, verified_counter = verify_cleaning(
-            current_counter,
+        cleaning_status, verified_telemetry = verify_cleaning(
+            telemetry["total_pages"],
             telemetry["manual_cleanings"],
+            telemetry["automatic_cleanings"],
         )
         if cleaning_status == "confirmed":
             notify_discord("✅ Scheduled light printhead cleaning completed.")
@@ -88,12 +108,13 @@ def process_once(today=None):
         elif cleaning_status == "cancelled":
             notify_discord("🛑 New print jobs detected. Cancelling scheduled cleaning.")
             state["cleaning_scheduled"] = False
-            state["last_counter"] = verified_counter
             state["last_activity_date"] = today.isoformat()
     elif (today - last_activity).days >= config.CLEANING_INTERVAL_DAYS - 1:
         state["cleaning_scheduled"] = True
 
-    state["last_counter"] = max(state["last_counter"], current_counter)
+    state["last_page_count"] = telemetry["total_pages"]
+    state["last_manual_cleanings"] = telemetry["manual_cleanings"]
+    state["last_automatic_cleanings"] = telemetry["automatic_cleanings"]
     save_state(config.STATE_FILE, state)
     return state
 

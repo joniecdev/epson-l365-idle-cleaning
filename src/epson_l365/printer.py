@@ -19,6 +19,7 @@ def read_telemetry():
     data = response[data_start:]
     return {
         "manual_cleanings": data[24],
+        "automatic_cleanings": data[25],
         "total_pages": struct.unpack_from("<I", data, 37)[0],
     }
 
