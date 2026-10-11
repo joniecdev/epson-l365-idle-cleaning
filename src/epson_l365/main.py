@@ -10,7 +10,7 @@ from .state import load_state, save_state
 
 
 def notify_discord(message):
-    if not config.DISCORD_WEBHOOK or config.DISCORD_WEBHOOK == "YOUR_DISCORD_WEBHOOK_URL":
+    if not config.DISCORD_WEBHOOK:
         return False
     try:
         response = requests.post(

@@ -1,0 +1,32 @@
+services:
+  epson-l365-cleaning:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: epson-l365-cleaning
+    restart: "no"
+    volumes:
+      - epson_l365_data:/data
+    environment:
+      - PRINTER_HOST
+      - DISCORD_WEBHOOK
+      - CLEANING_INTERVAL_DAYS
+      - STATE_FILE
+      - SNMP_PAYLOAD_HEX
+      - CLEANING_PAYLOAD_HEX
+      - CLEANING_PORT
+      - SNMP_PORT
+      - SOCKET_TIMEOUT_SECONDS
+      - CLEANING_CONFIRMATION_DELAY_SECONDS
+      - CLEANING_RETRY_DELAY_SECONDS
+      - CLEANING_MAX_ATTEMPTS
+    networks:
+      - epson_l365_network
+
+volumes:
+  epson_l365_data:
+
+networks:
+  epson_l365_network:
+    name: epson_l365_network
+    driver: bridge

@@ -1,5 +1,8 @@
 import unittest
+import os
 from unittest.mock import patch
+
+os.environ.setdefault("PRINTER_HOST", "localhost")
 
 from src.epson_l365.printer import Printer
 

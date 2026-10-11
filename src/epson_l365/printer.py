@@ -9,7 +9,7 @@ def read_telemetry():
     marker = bytes.fromhex("63 64 01 00 00")
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.settimeout(config.SOCKET_TIMEOUT_SECONDS)
-        sock.sendto(payload, (config.PRINTER_IP, config.SNMP_PORT))
+        sock.sendto(payload, (config.PRINTER_HOST, config.SNMP_PORT))
         response, _ = sock.recvfrom(4096)
 
     marker_index = response.find(marker)
@@ -35,7 +35,7 @@ def trigger_cleaning():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as connection:
             connection.settimeout(5)
-            connection.connect((config.PRINTER_IP, config.CLEANING_PORT))
+            connection.connect((config.PRINTER_HOST, config.CLEANING_PORT))
             connection.sendall(payload)
     except socket.timeout:
         return False
@@ -47,7 +47,7 @@ def trigger_cleaning():
 
 class Printer:
     def __init__(self, connection_details=None):
-        self.connection_details = connection_details or {"host": config.PRINTER_IP}
+        self.connection_details = connection_details or {"host": config.PRINTER_HOST}
         self.status = None
 
     def check_status(self):
