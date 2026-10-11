@@ -56,17 +56,17 @@ def process_once(today=None):
         if state["cleaning_scheduled"]:
             if not state["notified_offline_sched"]:
                 notify_discord(
-                    "⚠️ The printer is offline on the scheduled cleaning day. "
+                    "⚠️ The printer is offline on the cleaning day. "
                     "Waiting for it to come back online."
                 )
                 state["notified_offline_sched"] = True
         elif (today - last_activity).days >= config.CLEANING_INTERVAL_DAYS - 1:
             if not state["notified_offline_interval"]:
                 notify_discord(
-                    "⚠️ The idle period has passed, but the printer is offline. "
-                    "Turn it on so cleaning can be scheduled."
+                    "⚠️ The printer is offline. Turn it on to schedule cleaning."
                 )
                 state["notified_offline_interval"] = True
+            state["cleaning_scheduled"] = True
         save_state(config.STATE_FILE, state)
         return state
 
@@ -83,7 +83,7 @@ def process_once(today=None):
         state["last_automatic_cleanings"] = telemetry["automatic_cleanings"]
         state["last_activity_date"] = today.isoformat()
         if state["cleaning_scheduled"]:
-            notify_discord("🛑 New print jobs detected. Cancelling scheduled cleaning.")
+            notify_discord("🛑 Print jobs detected. Cancelling scheduled cleaning.")
             state["cleaning_scheduled"] = False
     elif cleaning_count_increased:
         state["last_page_count"] = telemetry["total_pages"]
@@ -91,9 +91,7 @@ def process_once(today=None):
         state["last_automatic_cleanings"] = telemetry["automatic_cleanings"]
         state["last_activity_date"] = today.isoformat()
         if state["cleaning_scheduled"]:
-            notify_discord(
-                "🛑 Cleaning activity detected. Cancelling scheduled cleaning."
-            )
+            notify_discord("🛑 Cleaning activity detected. Cancelling scheduled cleaning.")
             state["cleaning_scheduled"] = False
     elif state["cleaning_scheduled"]:
         cleaning_status, verified_telemetry = verify_cleaning(
@@ -102,15 +100,25 @@ def process_once(today=None):
             telemetry["automatic_cleanings"],
         )
         if cleaning_status == "confirmed":
-            notify_discord("✅ Scheduled light printhead cleaning completed.")
+            notify_discord("✅ Scheduled light cleaning completed.")
             state["cleaning_scheduled"] = False
             state["last_activity_date"] = today.isoformat()
         elif cleaning_status == "cancelled":
-            notify_discord("🛑 New print jobs detected. Cancelling scheduled cleaning.")
+            notify_discord("🛑 Print jobs detected. Cancelling scheduled cleaning.")
             state["cleaning_scheduled"] = False
             state["last_activity_date"] = today.isoformat()
+        elif cleaning_status == "unconfirmed":
+            notify_discord(
+                "❌ Error: The printer ignored 3 cleaning attempts "
+                "(it was probably busy). I will try again tomorrow."
+            )
     elif (today - last_activity).days >= config.CLEANING_INTERVAL_DAYS - 1:
+        idle_days = (today - last_activity).days
         state["cleaning_scheduled"] = True
+        notify_discord(
+            f"⏳ No printing for {idle_days} days. Scheduling light cleaning for tomorrow. "
+            "Print anything if you want to cancel it."
+        )
 
     state["last_page_count"] = telemetry["total_pages"]
     state["last_manual_cleanings"] = telemetry["manual_cleanings"]
