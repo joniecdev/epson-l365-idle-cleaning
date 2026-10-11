@@ -10,7 +10,7 @@ from .state import load_state, save_state
 
 
 def notify_discord(message):
-    if not config.DISCORD_WEBHOOK or config.DISCORD_WEBHOOK == "URL_DO_WEBHOOKA":
+    if not config.DISCORD_WEBHOOK or config.DISCORD_WEBHOOK == "YOUR_DISCORD_WEBHOOK_URL":
         return False
     try:
         response = requests.post(
@@ -54,15 +54,15 @@ def process_once(today=None):
         if state["cleaning_scheduled"]:
             if not state["notified_offline_sched"]:
                 notify_discord(
-                    "⚠️ Drukarka jest offline w dniu zaplanowanego czyszczenia. "
-                    "Czekam na powrót do sieci."
+                    "⚠️ The printer is offline on the scheduled cleaning day. "
+                    "Waiting for it to come back online."
                 )
                 state["notified_offline_sched"] = True
         elif (today - last_activity).days >= config.CLEANING_INTERVAL_DAYS - 1:
             if not state["notified_offline_interval"]:
                 notify_discord(
-                    "⚠️ Minął czas bezruchu, ale drukarka jest wyłączona. "
-                    "Włącz ją, abym mógł jutro zaplanować czyszczenie."
+                    "⚠️ The idle period has passed, but the printer is offline. "
+                    "Turn it on so cleaning can be scheduled."
                 )
                 state["notified_offline_interval"] = True
         save_state(config.STATE_FILE, state)
@@ -74,7 +74,7 @@ def process_once(today=None):
         state["last_counter"] = current_counter
         state["last_activity_date"] = today.isoformat()
         if state["cleaning_scheduled"]:
-            notify_discord("🛑 Wykryto nowe wydruki. Anuluję zaplanowane czyszczenie.")
+            notify_discord("🛑 New print jobs detected. Cancelling scheduled cleaning.")
             state["cleaning_scheduled"] = False
     elif state["cleaning_scheduled"]:
         cleaning_status, verified_counter = verify_cleaning(
@@ -82,11 +82,11 @@ def process_once(today=None):
             telemetry["manual_cleanings"],
         )
         if cleaning_status == "confirmed":
-            notify_discord("✅ Wykonano zaplanowane, lekkie czyszczenie głowicy.")
+            notify_discord("✅ Scheduled light printhead cleaning completed.")
             state["cleaning_scheduled"] = False
             state["last_activity_date"] = today.isoformat()
         elif cleaning_status == "cancelled":
-            notify_discord("🛑 Wykryto nowe wydruki. Anuluję zaplanowane czyszczenie.")
+            notify_discord("🛑 New print jobs detected. Cancelling scheduled cleaning.")
             state["cleaning_scheduled"] = False
             state["last_counter"] = verified_counter
             state["last_activity_date"] = today.isoformat()
